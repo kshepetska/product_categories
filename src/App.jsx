@@ -7,7 +7,6 @@ import categoriesFromServer from './api/categories';
 import productsFromServer from './api/products';
 
 export const App = () => {
-  // Mock data
   const products = productsFromServer.map((product) => {
     const category = categoriesFromServer
       .find(c => c.id === product.categoryId);
