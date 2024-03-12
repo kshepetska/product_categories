@@ -1,87 +1,50 @@
 /* eslint-disable jsx-a11y/accessible-emoji */
 import React, { useState } from 'react';
 import './App.scss';
-import classNames from 'classnames';
 
 import usersFromServer from './api/users';
 import categoriesFromServer from './api/categories';
 import productsFromServer from './api/products';
 
-function getPreparedUsers(users, query) {
-  const normalizedQuery = query.trim().toLowerCase();
+export const App = () => {
+  // Mock data
+  const products = productsFromServer.map((product) => {
+    const category = categoriesFromServer
+      .find(c => c.id === product.categoryId);
+    const user = usersFromServer.find(u => u.id === category.ownerId);
 
-  return users
-    .filter(user => user.name.toLowerCase().includes(normalizedQuery))
-    .map(user => ({
-      ...user,
-      name: user.name.toLowerCase(),
-    }));
-}
+    return {
+      ...product,
+      categoryName: `${category.icon} - ${category.title}`,
+      owner: user,
+    };
+  });
 
-function getOwnerClassName(sex = 'm') {
-  return sex === 'm' ? 'has-text-link' : 'has-text-danger';
-}
-
-function getPreparedProducts(products, options, users, categories) {
-  const { query = '', user = null, selectedCategories = [] } = options;
-
-  let preparedProducts = [...products];
-
-  const normalizedQuery = query.trim().toLowerCase();
-
-  if (normalizedQuery) {
-    preparedProducts = preparedProducts
-      .filter(product => product.name.toLowerCase().includes(normalizedQuery));
-  }
-
-  if (user) {
-    preparedProducts = preparedProducts
-      .filter(product => product.user === user);
-  }
-
-  if (selectedCategories.length > 0) {
-    preparedProducts = preparedProducts
-      .filter(product => selectedCategories.includes(product.category));
-  }
-
-  return preparedProducts.map(product => ({
-    ...product,
-    userName: users.find(u => u.id === product.user)?.name || '',
-    categoryName: categories.find(c => c.id === product.category)?.title || '',
-    categoryIcon: categories.find(c => c.id === product.category)?.icon || '',
-  }));
-}
-
-export function App() {
-  const [selectedProduct, setSelectedProduct] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
-  const [selectedCategories, setSelectedCategories] = useState([]);
-  const [query, setQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const addProduct = (product) => {
-    setSelectedProduct([...selectedProduct, product]);
+  const renderOwnerName = user => (
+    <span className={user.sex === 'm' ? 'has-text-link' : 'has-text-danger'}>
+      {user.name}
+    </span>
+  );
+
+  const filterProductsByOwner = (user) => {
+    setSelectedUser(user);
   };
 
-  const isSelected = ({ id }) => selectedProduct.some(p => p.id === id);
-
-  const removeProduct = (product) => {
-    setSelectedProduct(selectedProduct.filter(p => p.id !== product.id));
+  const handleSearchInputChange = (e) => {
+    setSearchQuery(e.target.value);
   };
 
-  const clearFilters = () => {
-    setSelectedUser(null);
-    setSelectedCategories([]);
-    setQuery('');
-    setSelectedProduct([]);
+  const clearSearch = () => {
+    setSearchQuery('');
   };
 
-  const preparedUsers = getPreparedUsers(usersFromServer, query);
-
-  const visibleProducts = getPreparedProducts(productsFromServer, {
-    query,
-    user: selectedUser,
-    selectedCategories,
-  }, usersFromServer, categoriesFromServer);
+  const filteredProducts = products
+    .filter(product => selectedUser === null || product.owner === selectedUser)
+    .filter(product => product.name.toLowerCase()
+      .includes(searchQuery.toLowerCase()));
 
   return (
     <div className="section">
@@ -92,80 +55,51 @@ export function App() {
           <nav className="panel">
             <p className="panel-heading">Filters</p>
 
-            <div className="panel-tabs has-text-weight-bold">
+            <p className="panel-tabs has-text-weight-bold">
               <a
                 href="#/"
                 role="button"
-                tabIndex="0"
-                className={classNames('button', { 'is-active': !selectedUser })}
-                onClick={() => setSelectedUser(null)}
+                className={`button ${selectedUser === null ? 'is-active' : ''}`}
+                onClick={() => filterProductsByOwner(null)}
               >
                 All
               </a>
-              {preparedUsers.map(user => (
+
+              {usersFromServer.map(user => (
                 <a
                   key={user.id}
                   href="#/"
                   role="button"
-                  tabIndex="0"
-                  className={classNames('button',
-                    { 'is-active': selectedUser === user.id })}
-                  onClick={() => setSelectedUser(user.id)}
+                  className={`button ${selectedUser === user ? 'is-active' : ''}`}
+                  onClick={() => filterProductsByOwner(user)}
                 >
                   {user.name}
                 </a>
               ))}
-            </div>
-
-            <div className="panel-block is-flex-wrap-wrap">
-              <button
-                type="button"
-                className={classNames('button is-success mr-6 is-outlined', {
-                  'is-active': selectedCategories.length === 0,
-                })}
-                onClick={() => setSelectedCategories([])}
-              >
-                All
-              </button>
-
-              {visibleProducts.map(product => (
-                <a
-                  key={product.id}
-                  data-cy="Category"
-                  className={classNames('button mr-2 my-1', {
-                    'is-info': isSelected(product),
-                  })}
-                  href="#/"
-                  onClick={() => (isSelected(product)
-                    ? removeProduct(product) : addProduct(product))}
-                >
-                  {product.category}
-                </a>
-              ))}
-
-            </div>
-
-            <div className="panel-block">
-              <button
-                type="button"
-                className="button is-link is-outlined is-fullwidth"
-                onClick={clearFilters}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    clearFilters();
-                  }
-                }}
-              >
-                Reset all filters
-              </button>
-            </div>
+            </p>
           </nav>
         </div>
 
         <div className="box table-container">
-          {visibleProducts.length === 0 && (
-            <p>No products matching selected criteria</p>
-          )}
+          <div className="field has-addons">
+            <p className="control is-expanded">
+              <input
+                type="text"
+                className="input"
+                placeholder="Search by name"
+                value={searchQuery}
+                onChange={handleSearchInputChange}
+              />
+            </p>
+            <p className="control">
+              <button
+                type="button"
+                className="delete is-danger"
+                onClick={clearSearch}
+              />
+            </p>
+          </div>
+
           <table className="table is-striped is-narrow is-fullwidth">
             <thead>
               <tr>
@@ -177,24 +111,12 @@ export function App() {
             </thead>
 
             <tbody>
-              {visibleProducts.map(product => (
+              {filteredProducts.map(product => (
                 <tr key={product.id}>
                   <td className="has-text-weight-bold">{product.id}</td>
-
                   <td>{product.name}</td>
-                  <td>
-                    <span role="img" aria-label="Category Icon">
-                      {product.categoryIcon}
-                    </span>
-                    {' '}
-                    {product.categoryName}
-                  </td>
-
-                  <td className={getOwnerClassName(usersFromServer
-                    .find(u => u.id === product.user)?.sex)}
-                  >
-                    {product.userName}
-                  </td>
+                  <td>{product.categoryName}</td>
+                  <td>{renderOwnerName(product.owner)}</td>
                 </tr>
               ))}
             </tbody>
@@ -203,6 +125,6 @@ export function App() {
       </div>
     </div>
   );
-}
+};
 
 export default App;
